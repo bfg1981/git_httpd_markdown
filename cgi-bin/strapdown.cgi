@@ -147,6 +147,21 @@ our %Helpstr=(
 	  'title' => 'The HTML title of this document. Default __name of the file__',
 	 );
 
+our %EnvDefaults=(
+	  'STRAPDOWN_DESCRIPTION' => 'description',
+	  'STRAPDOWN_OG_DESCRIPTION' => 'ogdescription',
+	  'STRAPDOWN_OG_IMAGE' => 'ogimage',
+	  'STRAPDOWN_OG_SITE_NAME' => 'ogsite_name',
+	  'STRAPDOWN_OG_TITLE' => 'ogtitle',
+	  'STRAPDOWN_OG_TYPE' => 'ogtype',
+	  'STRAPDOWN_OG_URL' => 'ogurl',
+	  'STRAPDOWN_SHORTCUTICON' => 'shortcuticon',
+	  'STRAPDOWN_THEME' => 'theme',
+	  'STRAPDOWN_TITLE' => 'title',
+	 );
+
+applyEnvDefaults(\%PageVars, \%EnvDefaults);
+
 sub logg {
   if ($PageVars{'logfile'}) {
     if ($_[0]>=$logLevel) {
@@ -633,6 +648,15 @@ sub transferValidVars {
     } else {
       error("# undefined key '$key' used");
     }
+  }
+}
+
+sub applyEnvDefaults {
+  my ($dest, $env_defaults) = @_;
+  foreach my $env_key (keys %{$env_defaults}) {
+    next if (!defined $ENV{$env_key} || $ENV{$env_key} eq '');
+    my $page_key=$env_defaults->{$env_key};
+    $dest->{$page_key}=$ENV{$env_key};
   }
 }
 
