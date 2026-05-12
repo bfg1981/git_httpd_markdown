@@ -276,9 +276,10 @@ sub createPage {
   }
 
   if (! $vars->{'title'}) {
-    ($vars->{'title'})=$ENV{'PATH_INFO'}=~/([^\/]+)$/;
+    $vars->{'title'}=markdownTitle($body);
+    ($vars->{'title'})=$ENV{'PATH_INFO'}=~/([^\/]+)$/ if (! $vars->{'title'});
   }
-  my $metadata=createMetadata($vars);
+  my $metadata=createMetadata($body, $vars);
   logg DEBUG, "Caching is defined as ".$vars->{'caching'};
   my $cache=(! defined($vars->{'caching'})) || str2bool($vars->{'caching'});
   logg DEBUG, "Caching: ".$cache;
@@ -368,13 +369,14 @@ ${body}
 }
 
 sub createMetadata {
+  my $body=shift;
   my $vars=shift;
   my $title=$vars->{'ogtitle'} || $vars->{'title'};
-  my $description=$vars->{'ogdescription'} || $vars->{'description'};
+  my $description=$vars->{'ogdescription'} || $vars->{'description'} || markdownDescription($body);
   my $type=$vars->{'ogtype'} || 'website';
   my $url=$vars->{'ogurl'} || currentUrl();
   my $image=$vars->{'ogimage'};
-  my $site_name=$vars->{'ogsite_name'};
+  my $site_name=$vars->{'ogsite_name'} || defaultSiteName();
   my $meta='';
 
   $meta.=metaTag('name', 'description', $description) if ($description);
@@ -393,6 +395,65 @@ sub createMetadata {
   }
 
   return $meta;
+}
+
+sub markdownTitle {
+  my $body=shift;
+  foreach my $line (split(/\n/, $body)) {
+    if ($line=~/^\s*#\s+(.+?)\s*#*\s*$/) {
+      return stripMarkdownInline($1);
+    }
+  }
+  return undef;
+}
+
+sub markdownDescription {
+  my $body=shift;
+  my $paragraph='';
+  my $in_code=0;
+  foreach my $line (split(/\n/, $body)) {
+    if ($line=~/^\s*```/) {
+      $in_code=!$in_code;
+      next;
+    }
+    next if ($in_code);
+    next if ($line=~/^\s*#/);
+    next if ($line=~/^\s*[-*_]{3,}\s*$/);
+    next if ($line=~/^\s*$/ && !$paragraph);
+    last if ($line=~/^\s*$/ && $paragraph);
+    $paragraph.=' ' if ($paragraph);
+    $paragraph.=trim($line);
+  }
+  $paragraph=stripMarkdownInline($paragraph);
+  return truncateText($paragraph, 220) if ($paragraph);
+  return undef;
+}
+
+sub stripMarkdownInline {
+  my $text=shift;
+  return undef if (!defined $text);
+  $text=~s/!\[([^\]]*)\]\([^\)]*\)/$1/g;
+  $text=~s/\[([^\]]+)\]\([^\)]*\)/$1/g;
+  $text=~s/`([^`]*)`/$1/g;
+  $text=~s/[*_~]+//g;
+  $text=~s/<[^>]+>//g;
+  $text=trim($text);
+  return $text;
+}
+
+sub truncateText {
+  my ($text, $limit)=@_;
+  return $text if (length($text)<=$limit);
+  my $short=substr($text, 0, $limit);
+  $short=~s/\s+\S*$//;
+  return trim($short).'...';
+}
+
+sub defaultSiteName {
+  return undef if (!$ENV{'HTTP_HOST'});
+  my $host=$ENV{'HTTP_HOST'};
+  $host=~s/:\d+$//;
+  return $host;
 }
 
 sub metaTag {
