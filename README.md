@@ -4,6 +4,13 @@ Markdown rendering layer for `git_httpd`. The image serves `.md` and `.mdh`
 files through `strapdown.cgi`, deriving HTML metadata from document front matter,
 Markdown content, and optional container-wide defaults.
 
+## Repository and image
+
+- Source repository: [bfg1981/git_httpd_markdown](https://github.com/bfg1981/git_httpd_markdown)
+- DockerHub image: [therealbfg/git_httpd_markdown](https://hub.docker.com/r/therealbfg/git_httpd_markdown)
+- Upstream source repository: [bfg1981/git_httpd](https://github.com/bfg1981/git_httpd)
+- Upstream DockerHub image: [therealbfg/git_httpd](https://hub.docker.com/r/therealbfg/git_httpd)
+
 ## Environment variables
 
 These variables provide site-wide defaults. Document front matter can still
