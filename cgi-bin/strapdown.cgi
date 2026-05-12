@@ -656,8 +656,18 @@ sub applyEnvDefaults {
   foreach my $env_key (keys %{$env_defaults}) {
     next if (!defined $ENV{$env_key} || $ENV{$env_key} eq '');
     my $page_key=$env_defaults->{$env_key};
-    $dest->{$page_key}=$ENV{$env_key};
+    $dest->{$page_key}=unquoteEnvValue($ENV{$env_key});
   }
+}
+
+sub unquoteEnvValue {
+  my $value=shift;
+  return undef if (!defined $value);
+  $value=trim($value);
+  if (($value=~/^"(.*)"$/s) || ($value=~/^'(.*)'$/s)) {
+    return $1;
+  }
+  return $value;
 }
 
 sub prefail {
