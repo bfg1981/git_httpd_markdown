@@ -109,9 +109,16 @@ our %CanOverride;
 our %PageVars=(
        'caching' => undef,
        'debug' => undef,
+       'description' => undef,
        'help' => undef,
        'logfile' => undef,
        'loglevel' => undef,
+       'ogdescription' => undef,
+       'ogimage' => undef,
+       'ogsite_name' => undef,
+       'ogtitle' => undef,
+       'ogtype' => undef,
+       'ogurl' => undef,
        'preload' => undef,
        'raw' => undef,
        'scriptbase' => '//bits.efn.no',
@@ -123,9 +130,16 @@ our %PageVars=(
 our %Helpstr=(
 	  'caching' => 'Caching enabled. Default __on__.',
 	  'debug' => 'Show a list of debug variables. Default __off__.',
+	  'description' => 'Page description used for regular and OpenGraph metadata. Default *None*.',
 	  'help' => 'Show this help text. Default __off__.',
 	  'logfile' => 'Log destination file. Default *None*.',
 	  'logfile' => 'Log level. Available values are `DEBUG` and `INFO`. Default `INFO`.',
+	  'ogdescription' => 'OpenGraph description. Defaults to `description` when set.',
+	  'ogimage' => 'OpenGraph image URL. Relative URLs are resolved against the current page URL.',
+	  'ogsite_name' => 'OpenGraph site name. Default *None*.',
+	  'ogtitle' => 'OpenGraph title. Defaults to `title`.',
+	  'ogtype' => 'OpenGraph object type. Default `website`.',
+	  'ogurl' => 'OpenGraph canonical URL. Defaults to the current request URL when available.',
 	  'preload' => 'Uses static knowledge of `strapdown.js` to speed up page loading. Default __on__',
 	  'raw' => 'Display the raw *Markdown*. Default __off__.',
 	  'scriptbase' => 'Where all the scripts are located. Default `//bits.efn.no`. This will probably change in the future',
@@ -264,6 +278,7 @@ sub createPage {
   if (! $vars->{'title'}) {
     ($vars->{'title'})=$ENV{'PATH_INFO'}=~/([^\/]+)$/;
   }
+  my $metadata=createMetadata($vars);
   logg DEBUG, "Caching is defined as ".$vars->{'caching'};
   my $cache=(! defined($vars->{'caching'})) || str2bool($vars->{'caching'});
   logg DEBUG, "Caching: ".$cache;
@@ -334,7 +349,8 @@ ${lmTime}
 <!DOCTYPE html>
 <html>
 <head>
-  <title>$vars->{'title'}</title>
+  <title>".htmlEscape($vars->{'title'})."</title>
+${metadata}
 ${preload}
 ${metaredir}
 </head>
@@ -349,6 +365,73 @@ ${body}
 </body>
 </html>
 ";
+}
+
+sub createMetadata {
+  my $vars=shift;
+  my $title=$vars->{'ogtitle'} || $vars->{'title'};
+  my $description=$vars->{'ogdescription'} || $vars->{'description'};
+  my $type=$vars->{'ogtype'} || 'website';
+  my $url=$vars->{'ogurl'} || currentUrl();
+  my $image=$vars->{'ogimage'};
+  my $site_name=$vars->{'ogsite_name'};
+  my $meta='';
+
+  $meta.=metaTag('name', 'description', $description) if ($description);
+  $meta.=metaTag('property', 'og:title', $title) if ($title);
+  $meta.=metaTag('property', 'og:type', $type) if ($type);
+  $meta.=metaTag('property', 'og:description', $description) if ($description);
+  $meta.=metaTag('property', 'og:url', $url) if ($url);
+  $meta.=metaTag('property', 'og:image', absoluteUrl($image)) if ($image);
+  $meta.=metaTag('property', 'og:site_name', $site_name) if ($site_name);
+  if ($title || $description || $image) {
+    my $card=($image) ? 'summary_large_image' : 'summary';
+    $meta.=metaTag('name', 'twitter:card', $card);
+    $meta.=metaTag('name', 'twitter:title', $title) if ($title);
+    $meta.=metaTag('name', 'twitter:description', $description) if ($description);
+    $meta.=metaTag('name', 'twitter:image', absoluteUrl($image)) if ($image);
+  }
+
+  return $meta;
+}
+
+sub metaTag {
+  my ($attr, $name, $content)=@_;
+  return '' if (!defined $content || $content eq '');
+  return sprintf("  <meta %s=\"%s\" content=\"%s\">\n",
+		 htmlEscape($attr), htmlEscape($name), htmlEscape($content));
+}
+
+sub currentUrl {
+  return undef if (!$ENV{'HTTP_HOST'} || !$ENV{'REQUEST_URI'});
+  my $proto=$ENV{'HTTP_X_FORWARDED_PROTO'} || $ENV{'REQUEST_SCHEME'} || (($ENV{'HTTPS'} && $ENV{'HTTPS'} eq 'on') ? 'https' : 'http');
+  $proto=~s/,.*$//;
+  return $proto.'://'.$ENV{'HTTP_HOST'}.$ENV{'REQUEST_URI'};
+}
+
+sub absoluteUrl {
+  my $url=shift;
+  return undef if (!defined $url || $url eq '');
+  return $url if ($url=~/^[a-z][a-z0-9+.-]*:/i);
+  my $proto=$ENV{'HTTP_X_FORWARDED_PROTO'} || $ENV{'REQUEST_SCHEME'} || (($ENV{'HTTPS'} && $ENV{'HTTPS'} eq 'on') ? 'https' : 'http');
+  $proto=~s/,.*$//;
+  return $proto.':'.$url if ($url=~/^\/\//);
+  return $url if (!$ENV{'HTTP_HOST'});
+  return $proto.'://'.$ENV{'HTTP_HOST'}.$url if ($url=~/^\//);
+  my $base=$ENV{'REQUEST_URI'} || '/';
+  $base=~s/\?.*$//;
+  $base=~s/[^\/]*$//;
+  return $proto.'://'.$ENV{'HTTP_HOST'}.$base.$url;
+}
+
+sub htmlEscape {
+  my $text=shift;
+  return '' if (!defined $text);
+  $text=~s/&/&amp;/g;
+  $text=~s/</&lt;/g;
+  $text=~s/>/&gt;/g;
+  $text=~s/"/&quot;/g;
+  return $text;
 }
 
 sub error {
